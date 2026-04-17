@@ -41,6 +41,12 @@ services:
       - CI=true
       - LH_USER_DATA=/data/userData
       - LH_LOGS_DIR=/data/logs
+      # Opt-in to run_tests.sh's offline enforcement probe.  The probe
+      # only makes sense here because this service runs with
+      # network_mode: none — on a host runner the probe would always
+      # succeed in reaching the public internet and produce a noisy
+      # false-negative.
+      - LH_OFFLINE_CHECK=1
     volumes:
       - leasehub-test-data:/data
     network_mode: none

@@ -127,15 +127,17 @@ fi
 # Only meaningful inside the sandboxed `test` service (network_mode: none).
 # On a host/CI runner the machine has real network, so the probe would
 # always "fail" in a way that says nothing about the app's offline
-# guarantee.  Detect the container environment and skip otherwise.
+# guarantee.
+#
+# We can't rely on /.dockerenv to detect "is this the test service",
+# because most CI runners (AWS CodeBuild, GitHub Actions container jobs,
+# etc.) also execute inside a container and carry that file.  Instead,
+# docker-compose.yml's `test` service sets LH_OFFLINE_CHECK=1 explicitly,
+# and we gate on that env var.  Unset => skip.
 echo
 echo "--- 3/3 Offline enforcement check ---"
-IN_DOCKER=0
-if [ -f /.dockerenv ] || [ -n "${LH_FORCE_OFFLINE_CHECK:-}" ]; then
-  IN_DOCKER=1
-fi
-if [ "$IN_DOCKER" -ne 1 ]; then
-  echo "skipped (host environment - offline enforcement is verified inside the Docker 'test' service, which runs with network_mode: none)"
+if [ -z "${LH_OFFLINE_CHECK:-}" ]; then
+  echo "skipped (LH_OFFLINE_CHECK not set - offline enforcement is verified inside the Docker 'test' service, which runs with network_mode: none)"
 else
   if ! node -e "
     const http = require('node:http');
