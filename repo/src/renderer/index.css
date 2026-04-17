@@ -1,0 +1,32 @@
+/* =========================================================================
+ * Global renderer styles — the Dear ImGui runtime renders the entire app
+ * surface into a single <canvas>.  Only cross-cutting bootstrap rules live
+ * here (reset, canvas sizing, font smoothing).  There is intentionally no
+ * HTML/CSS UI framework on the app surface.
+ * ========================================================================= */
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: #0f172a;  /* matches ImGui WindowBg — avoids flash on load */
+  color-scheme: dark;
+  -webkit-user-select: none;
+  user-select: none;
+  overflow: hidden;
+  font-family: "Segoe UI", "SF Pro Text", -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#imgui-canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  outline: none;
+  cursor: default;
+}
+
+/* High-DPI helper: keep crisp 1 px borders on 200% zoom displays. */
+@media (min-resolution: 192dpi) {
+  .hairline { border-width: 0.5px; }
+}

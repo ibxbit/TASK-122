@@ -1,0 +1,51 @@
+# ============================================================================
+# LeaseHub Operations Console — orchestration
+#
+#   docker compose up --build      → build + start `app` (idles after banner)
+#   docker compose run --rm test   → one-shot test run; exits with suite status
+#
+# Both services run with `network_mode: none`, so no egress is possible from
+# inside either container.  The application's in-process network guard
+# (src/main/security/network-guard.ts) is a defence-in-depth layer above this.
+# ============================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: leasehub-console:latest
+    container_name: leasehub-app
+    working_dir: /app
+    environment:
+      - NODE_ENV=production
+      - CI=true
+      - LH_USER_DATA=/data/userData
+      - LH_LOGS_DIR=/data/logs
+      # Deterministic demo credentials seeded on startup — one fixed
+      # account per role documented in README.md.  Remove in production.
+      - LH_DEMO_SEED=1
+    volumes:
+      - leasehub-data:/data
+    network_mode: none
+    restart: unless-stopped
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: leasehub-console:latest
+    working_dir: /app
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - LH_USER_DATA=/data/userData
+      - LH_LOGS_DIR=/data/logs
+    volumes:
+      - leasehub-test-data:/data
+    network_mode: none
+    command: ["./run_tests.sh"]
+
+volumes:
+  leasehub-data:
+  leasehub-test-data:
