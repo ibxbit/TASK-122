@@ -47,10 +47,11 @@ describe('Scheduler lifecycle', () => {
 
     const s = new Scheduler([{ id: 'quick', spec, run }]);
     s.start();
-    // Advance past fire time
-    vi.advanceTimersByTime(120_000);
-    // Allow async microtask to resolve
-    await vi.runAllTimersAsync();
+    // Advance past fire time so the scheduled timer fires and re-schedules.
+    // Do NOT use runAllTimersAsync() — a recurring daily job would re-add a
+    // new timer after each run, and runAllTimersAsync drains the queue
+    // forever (vitest aborts after 10k iterations).
+    await vi.advanceTimersByTimeAsync(120_000);
     s.stop();
     vi.useRealTimers();
     // The job may or may not have fired depending on timer alignment, but stop() runs cleanly
@@ -65,8 +66,7 @@ describe('Scheduler lifecycle', () => {
 
     const s = new Scheduler([{ id: 'failing', spec, run }]);
     s.start();
-    vi.advanceTimersByTime(120_000);
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(120_000);
     // Scheduler should still be alive — stop cleanly proves it didn't throw
     s.stop();
     vi.useRealTimers();

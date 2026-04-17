@@ -49,6 +49,12 @@ describe('importRouteDataset() + optimize flow', () => {
       });
 
       const db = makeTestDb();
+      // route_datasets.imported_by has an FK to users(id); seed the actor
+      // before kicking off the import.
+      db.prepare('INSERT INTO tenants (id, name) VALUES (?, ?)').run('t_test', 'Test');
+      db.prepare(
+        `INSERT INTO users (id, tenant_id, username, display_name, status) VALUES (?, ?, ?, ?, 'active')`,
+      ).run('u_tester', 't_test', 'tester', 'Tester');
       const imported = await importRouteDataset(db, dir, 'u_tester');
       expect(imported.counts).toEqual({ nodes: 3, edges: 3, addresses: 2, restrictions: 0 });
 
@@ -84,6 +90,10 @@ describe('importRouteDataset() + optimize flow', () => {
       }));
 
       const db = makeTestDb();
+      db.prepare('INSERT INTO tenants (id, name) VALUES (?, ?)').run('t_test', 'Test');
+      db.prepare(
+        `INSERT INTO users (id, tenant_id, username, display_name, status) VALUES (?, ?, ?, ?, 'active')`,
+      ).run('u_tester', 't_test', 'tester', 'Tester');
       await expect(importRouteDataset(db, dir, 'u_tester')).rejects.toBeInstanceOf(DatasetLoadError);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });

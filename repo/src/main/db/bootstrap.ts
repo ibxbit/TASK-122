@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import { app } from 'electron';
-import { promises as fs } from 'node:fs';
+import { mkdirSync, writeFileSync, chmodSync } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { hashPassword } from '../contracts/signing';
@@ -216,12 +216,18 @@ export function bootstrapFirstRun(
   });
 
   // Persist the initial credentials where the admin can retrieve them.
+  // Synchronous: callers (and tests) rely on the file existing the moment
+  // bootstrapFirstRun() returns, and the payload is a sub-kilobyte text
+  // file so the write is instant.
   let credentialsPath: string | null = null;
   if (!opts.skipCredentialsFile) {
     credentialsPath = opts.credentialsPath
       ?? path.join(app.getPath('userData'), 'initial-credentials.txt');
-    writeCredentials(credentialsPath, username, password, tenantId)
-      .catch((err) => logger.error({ err }, 'bootstrap_credentials_write_failed'));
+    try {
+      writeCredentialsSync(credentialsPath, username, password, tenantId);
+    } catch (err) {
+      logger.error({ err }, 'bootstrap_credentials_write_failed');
+    }
   }
 
   logger.warn(
@@ -283,10 +289,10 @@ function generateInitialPassword(): string {
   return raw.slice(0, 18);
 }
 
-async function writeCredentials(
+function writeCredentialsSync(
   p: string, username: string, password: string, tenantId: string,
-): Promise<void> {
-  await fs.mkdir(path.dirname(p), { recursive: true });
+): void {
+  mkdirSync(path.dirname(p), { recursive: true });
   const body = [
     '# LeaseHub — initial administrator credentials',
     '# Generated at: ' + new Date().toISOString(),
@@ -297,8 +303,8 @@ async function writeCredentials(
     `password: ${password}`,
     '',
   ].join('\n');
-  await fs.writeFile(p, body, { encoding: 'utf8' });
-  try { await fs.chmod(p, 0o400); } catch { /* Windows best-effort */ }
+  writeFileSync(p, body, { encoding: 'utf8' });
+  try { chmodSync(p, 0o400); } catch { /* Windows best-effort */ }
 }
 
 /* Exports used by tests to assert the catalog is complete. */

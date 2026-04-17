@@ -7,52 +7,63 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * ========================================================================= */
 
 // ── Electron stubs ──────────────────────────────────────────────────────
-let capturedOpts: any = {};
-const webContentsSend = vi.fn();
-const setWindowOpenHandler = vi.fn();
-const willNavigateListeners: Function[] = [];
-const closedListeners: Function[] = [];
-const readyToShowListeners: Function[] = [];
+// vi.mock is hoisted above every top-level const/function declaration, so
+// the spies + factory have to live inside a vi.hoisted() block (otherwise
+// the mock factory sees `makeBW` etc. as uninitialised and fails with the
+// opaque "error when mocking a module" message).
+const h = vi.hoisted(() => {
+  const webContentsSend = vi.fn();
+  const setWindowOpenHandler = vi.fn();
+  const willNavigateListeners: Function[] = [];
+  const closedListeners:       Function[] = [];
+  const readyToShowListeners:  Function[] = [];
+  const appendSwitchSpy = vi.fn();
+  const state = { capturedOpts: {} as any };
 
-function makeBW(opts: any) {
-  capturedOpts = opts;
-  const self: any = {
-    _opts: opts,
-    isDestroyed: vi.fn().mockReturnValue(false),
-    isMinimized: vi.fn().mockReturnValue(false),
-    isFocused: vi.fn().mockReturnValue(false),
-    isMaximized: vi.fn().mockReturnValue(false),
-    show: vi.fn(),
-    hide: vi.fn(),
-    focus: vi.fn(),
-    close: vi.fn(),
-    restore: vi.fn(),
-    maximize: vi.fn(),
-    getBounds: () => ({ x: 0, y: 0, width: opts.width, height: opts.height }),
-    loadURL: vi.fn().mockResolvedValue(undefined),
-    loadFile: vi.fn().mockResolvedValue(undefined),
-    webContents: {
-      send: webContentsSend,
-      setWindowOpenHandler,
+  function makeBW(opts: any) {
+    state.capturedOpts = opts;
+    const self: any = {
+      _opts: opts,
+      isDestroyed: vi.fn().mockReturnValue(false),
+      isMinimized: vi.fn().mockReturnValue(false),
+      isFocused:   vi.fn().mockReturnValue(false),
+      isMaximized: vi.fn().mockReturnValue(false),
+      show: vi.fn(),
+      hide: vi.fn(),
+      focus: vi.fn(),
+      close: vi.fn(),
+      restore: vi.fn(),
+      maximize: vi.fn(),
+      getBounds: () => ({ x: 0, y: 0, width: opts.width, height: opts.height }),
+      loadURL:  vi.fn().mockResolvedValue(undefined),
+      loadFile: vi.fn().mockResolvedValue(undefined),
+      webContents: {
+        send: webContentsSend,
+        setWindowOpenHandler,
+        on: vi.fn((ev: string, fn: Function) => {
+          if (ev === 'will-navigate') willNavigateListeners.push(fn);
+        }),
+      },
       on: vi.fn((ev: string, fn: Function) => {
-        if (ev === 'will-navigate') willNavigateListeners.push(fn);
+        if (ev === 'closed') closedListeners.push(fn);
       }),
-    },
-    on: vi.fn((ev: string, fn: Function) => {
-      if (ev === 'closed') closedListeners.push(fn);
-    }),
-    once: vi.fn((ev: string, fn: Function) => {
-      if (ev === 'ready-to-show') readyToShowListeners.push(fn);
-    }),
-  };
-  return self;
-}
+      once: vi.fn((ev: string, fn: Function) => {
+        if (ev === 'ready-to-show') readyToShowListeners.push(fn);
+      }),
+    };
+    return self;
+  }
 
-const appendSwitchSpy = vi.fn();
+  return {
+    webContentsSend, setWindowOpenHandler,
+    willNavigateListeners, closedListeners, readyToShowListeners,
+    appendSwitchSpy, makeBW, state,
+  };
+});
 
 vi.mock('electron', () => ({
   BrowserWindow: Object.assign(
-    vi.fn().mockImplementation((opts: any) => makeBW(opts)),
+    vi.fn().mockImplementation((opts: any) => h.makeBW(opts)),
     { getFocusedWindow: vi.fn().mockReturnValue(null) },
   ),
   screen: {
@@ -62,9 +73,20 @@ vi.mock('electron', () => ({
     }),
   },
   app: {
-    commandLine: { appendSwitch: appendSwitchSpy },
+    commandLine: { appendSwitch: h.appendSwitchSpy },
   },
 }));
+
+// Back-compat aliases so the assertions further down can keep their prior names.
+const { webContentsSend, setWindowOpenHandler, willNavigateListeners,
+        closedListeners, readyToShowListeners, appendSwitchSpy } = h;
+// `capturedOpts` is reassigned every time BrowserWindow() is called, so
+// proxy property reads through to the hoisted state so old-style tests
+// that do `expect(capturedOpts.title).toBe(...)` keep observing the most
+// recently-captured value.
+const capturedOpts: any = new Proxy({}, {
+  get: (_t, key) => (h.state.capturedOpts as any)[key as string],
+});
 
 import { windowManager, enableHighDpi, type WindowKind } from '../../src/main/windows/WindowManager';
 
@@ -117,8 +139,9 @@ describe('WindowManager', () => {
       expect(capturedOpts.height).toBe(400);
     });
 
-    it('re-focuses existing window instead of creating a second one', () => {
-      const BW = vi.mocked(require('electron').BrowserWindow);
+    it('re-focuses existing window instead of creating a second one', async () => {
+      const { BrowserWindow } = await import('electron');
+      const BW = vi.mocked(BrowserWindow) as unknown as { mock: { calls: unknown[] } };
       const win1 = windowManager.open('dashboard');
       const callCount1 = BW.mock.calls.length;
       const win2 = windowManager.open('dashboard');

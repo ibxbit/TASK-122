@@ -239,7 +239,10 @@ export function runExpiryScan(db: Database, sink: NotificationSink): number {
     const days = Math.floor((row.effective_to - now) / 86400);
 
     // Try milestones ascending (7 → 30 → 60): fire the first that's
-    // applicable AND not yet recorded, then stop.
+    // applicable AND not yet recorded, then stop.  If the first
+    // applicable milestone has already been recorded, we stop — firing a
+    // coarser milestone for the same contract would be a regression
+    // (we've already alerted at a more urgent level).
     for (const m of MILESTONES) {
       if (days > m.days) continue;
 
@@ -250,7 +253,7 @@ export function runExpiryScan(db: Database, sink: NotificationSink): number {
         kind:       m.kind,
         now,
       });
-      if (res.changes === 0) continue;        // already fired this milestone
+      if (res.changes === 0) break;           // already fired this (or smaller) milestone
 
       const payload: ExpiryNotification = {
         kind:               m.kind,

@@ -20,6 +20,13 @@ function seedOrders(db: ReturnType<typeof makeTestDb>, tenantId: string) {
     { id: 'o4', status: 'cancelled', amount: 0,      customer: 'c3', at: base + 14_400 },
     { id: 'o5', status: 'completed', amount: 3_000,  customer: 'c2', at: base + 18_000 },    // repeat
   ];
+  // orders.subject_user_id has an FK to users(id) — seed the three customers
+  // first so the inserts below don't trip FOREIGN KEY constraint failed.
+  const insUser = db.prepare(
+    `INSERT INTO users (id, tenant_id, username, display_name, status) VALUES (?, ?, ?, ?, 'active')`,
+  );
+  for (const c of ['c1', 'c2', 'c3']) insUser.run(c, tenantId, c, c);
+
   const stmt = db.prepare(`
     INSERT INTO orders (id, tenant_id, order_number, kind, status, subject_user_id, amount_cents, currency, created_at, updated_at)
     VALUES (?, ?, ?, 'lease', ?, ?, ?, 'USD', ?, ?)

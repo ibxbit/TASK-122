@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { resetDbLifecycleForTests } from '../../src/main/db/cleanup';
 
 /* =========================================================================
  * In-memory SQLite builder for tests.
@@ -25,6 +26,14 @@ export interface SeededIds {
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../src/main/db/migrations');
 
 export function makeTestDb(): Database.Database {
+  // Every test that calls makeTestDb() is about to bind a fresh db into the
+  // DbLifecycle singleton.  Clear any prior binding from a previous test so
+  // initDbLifecycle({ db }) succeeds instead of throwing
+  // db_lifecycle_already_initialised — which would leave the singleton
+  // pointing at the already-closed db from the previous test, causing
+  // "The database connection is not open" on every subsequent call.
+  resetDbLifecycleForTests();
+
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
 

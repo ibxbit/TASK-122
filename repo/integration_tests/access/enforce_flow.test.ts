@@ -34,11 +34,13 @@ describe('evaluator precedence', () => {
   it('explicit deny beats ABAC merge', () => {
     const db = makeTestDb(); const ids = seedAccessGraph(db);
 
-    // Grant allow with scope + add an explicit deny.
+    // Grant allow with scope + flip the existing contract.delete grant to deny.
+    // role_permissions uses composite PK (role_id, permission_id) so the
+    // explicit deny is expressed by UPDATE-ing the effect column.
     db.prepare('INSERT INTO data_scopes (id, user_role_id, conditions) VALUES (?, ?, ?)')
       .run('ds1', 'ur_ops', JSON.stringify({ locationId: 'nyc' }));
-    db.prepare('INSERT INTO role_permissions (role_id, permission_id, effect) VALUES (?, ?, ?)')
-      .run('role_operations_manager', 'p_contract_delete', 'deny');
+    db.prepare('UPDATE role_permissions SET effect = ? WHERE role_id = ? AND permission_id = ?')
+      .run('deny', 'role_operations_manager', 'p_contract_delete');
 
     const r = evaluate(db, {
       userId: ids.opsUserId, tenantId: ids.tenantId,

@@ -104,10 +104,16 @@ describe('seedDemoCredentials', () => {
   });
 
   it('returns early with skippedUsers when the Default tenant is missing', () => {
-    // Wipe the tenant
+    // Wipe the tenant.  Bootstrap left audit_events with tenant_id='t_default'
+    // and those rows cannot be removed (audit_events is append-only by
+    // trigger).  Disable FK enforcement for the teardown so the orphan
+    // audit rows are acceptable — the seeder's guard only inspects
+    // tenants(id), which is what the test is exercising.
+    db.pragma('foreign_keys = OFF');
     db.prepare('DELETE FROM user_roles WHERE tenant_id = ?').run('t_default');
     db.prepare('DELETE FROM users      WHERE tenant_id = ?').run('t_default');
-    db.prepare('DELETE FROM tenants WHERE id = ?').run('t_default');
+    db.prepare('DELETE FROM tenants    WHERE id = ?').run('t_default');
+    db.pragma('foreign_keys = ON');
 
     const r = seedDemoCredentials(db);
     expect(r.createdUsers).toEqual([]);

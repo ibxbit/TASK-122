@@ -64,9 +64,11 @@ describe('evaluate()', () => {
 
   it('explicit deny wins over allow', () => {
     const db = makeTestDb(); const ids = seedAccessGraph(db);
-    // Add an explicit deny on contract.delete for OperationsManager.
-    db.prepare('INSERT INTO role_permissions (role_id, permission_id, effect) VALUES (?, ?, ?)')
-      .run('role_operations_manager', 'p_contract_delete', 'deny');
+    // Change OperationsManager's contract.delete grant to deny.  The
+    // composite PK (role_id, permission_id) means there is exactly one
+    // row per (role, perm), so deny is expressed by UPDATE-ing effect.
+    db.prepare('UPDATE role_permissions SET effect = ? WHERE role_id = ? AND permission_id = ?')
+      .run('deny', 'role_operations_manager', 'p_contract_delete');
     const r = evaluate(db, { userId: ids.opsUserId, tenantId: ids.tenantId, permissionCode: 'contract.delete', type: 'resource', action: 'write' });
     expect(r.allowed).toBe(false);
     expect(r.reason).toBe('explicit_deny');
@@ -85,14 +87,16 @@ describe('evaluate()', () => {
   it('merges data scopes across multiple grants (OR)', () => {
     const db = makeTestDb(); const ids = seedAccessGraph(db);
 
-    // Add two OperationsManager grants with different scopes for the same user.
-    db.prepare('INSERT INTO user_roles (id, user_id, role_id, tenant_id) VALUES (?, ?, ?, ?)')
-      .run('ur_ops_2', ids.opsUserId, 'role_operations_manager', ids.tenantId);
-
+    // Attach two data scopes to the same user_role grant (ur_ops).  The
+    // evaluator flattens all scope rows across every user_role into a
+    // single anyOf list, so multiple scopes on one grant exercises the
+    // OR-merge path just as well as multiple grants would — and the
+    // unique index uq_user_roles(user_id, role_id, tenant_id) forbids a
+    // second (u_ops, role_operations_manager, t_acme) row anyway.
     db.prepare('INSERT INTO data_scopes (id, user_role_id, conditions) VALUES (?, ?, ?)')
-      .run('ds1', 'ur_ops',   JSON.stringify({ locationId: 'nyc' }));
+      .run('ds1', 'ur_ops', JSON.stringify({ locationId: 'nyc' }));
     db.prepare('INSERT INTO data_scopes (id, user_role_id, conditions) VALUES (?, ?, ?)')
-      .run('ds2', 'ur_ops_2', JSON.stringify({ locationId: 'sfo' }));
+      .run('ds2', 'ur_ops', JSON.stringify({ locationId: 'sfo' }));
 
     const r = evaluate(db, { userId: ids.opsUserId, tenantId: ids.tenantId, permissionCode: 'contract.list', type: 'api' });
     expect(r.allowed).toBe(true);

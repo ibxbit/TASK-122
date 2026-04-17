@@ -86,7 +86,12 @@ export function summarizeLegs(legs: LegInput[], config: RouteConfig): LegSummary
     const miles     = l.distanceMeters / METERS_PER_MILE;
     const fuelCents = Math.round(miles * config.perMileCents);
     const tollEff   = Math.round(l.tollCents * mult);
+    // Arrival at leg i = depart + (sum of previous leg times) + leg-i time.
+    // Dwell is time spent AT each intermediate stop — it counts toward the
+    // NEXT leg's arrival, not this leg's, so add it after computing cumT
+    // for the current leg.
     cumT += l.timeSeconds;
+    const arrivalAt = depart + Math.round(cumT);
     if (i < legs.length - 1) cumT += dwell;
     return {
       distanceMeters:          l.distanceMeters,
@@ -96,7 +101,7 @@ export function summarizeLegs(legs: LegInput[], config: RouteConfig): LegSummary
       fuelCostCents:           fuelCents,
       tollCostCentsEffective:  tollEff,
       totalCostCents:          fuelCents + tollEff,
-      arrivalUnixSeconds:      depart + Math.round(cumT),
+      arrivalUnixSeconds:      arrivalAt,
     };
   });
 }

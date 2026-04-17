@@ -109,24 +109,33 @@ describe('isAllowed() comprehensive URL scheme coverage', () => {
   });
 });
 
-describe('network guard Electron session integration', () => {
-  const onBeforeRequestSpy = vi.fn();
-  const setProxySpy = vi.fn().mockResolvedValue(undefined);
-  const setPermReqSpy = vi.fn();
-  const setPermCheckSpy = vi.fn();
-  const sessionCreatedSpy = vi.fn();
+// vi.mock is hoisted to the top of the file — any variables it references
+// must be hoisted too, which is what vi.hoisted() provides.  Declaring the
+// spies below the describe() would leave them uninitialised at mock-factory
+// invocation time (ReferenceError: Cannot access 'session' before
+// initialization / the generic "error when mocking a module" message).
+const spies = vi.hoisted(() => ({
+  onBeforeRequestSpy: vi.fn(),
+  setProxySpy:        vi.fn().mockResolvedValue(undefined),
+  setPermReqSpy:      vi.fn(),
+  setPermCheckSpy:    vi.fn(),
+  sessionCreatedSpy:  vi.fn(),
+}));
 
-  vi.mock('electron', () => ({
-    app: { on: sessionCreatedSpy },
-    session: {
-      defaultSession: {
-        webRequest: { onBeforeRequest: onBeforeRequestSpy },
-        setPermissionRequestHandler: setPermReqSpy,
-        setPermissionCheckHandler: setPermCheckSpy,
-        setProxy: setProxySpy,
-      },
+vi.mock('electron', () => ({
+  app: { on: spies.sessionCreatedSpy },
+  session: {
+    defaultSession: {
+      webRequest: { onBeforeRequest: spies.onBeforeRequestSpy },
+      setPermissionRequestHandler: spies.setPermReqSpy,
+      setPermissionCheckHandler:   spies.setPermCheckSpy,
+      setProxy:                    spies.setProxySpy,
     },
-  }));
+  },
+}));
+
+describe('network guard Electron session integration', () => {
+  const { onBeforeRequestSpy, setProxySpy, setPermReqSpy, setPermCheckSpy, sessionCreatedSpy } = spies;
 
   it('calls setProxy with mode=direct to prevent system proxy tunneling', async () => {
     const { installNetworkGuard } = await import('../../src/main/security/network-guard');

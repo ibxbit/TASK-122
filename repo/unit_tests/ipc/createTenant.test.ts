@@ -35,18 +35,21 @@ describe('admin:createTenant', () => {
     db = makeTestDb();
     ids = seedAccessGraph(db);
     // Ensure the catalog + grants match production behaviour.
-    bootstrapFirstRun(db);
-    // Upgrade admin user to SystemAdmin for the positive test path.
-    db.prepare(`
-      INSERT INTO user_roles (id, user_id, role_id, tenant_id)
-      VALUES ('ur_sysadmin', ?, 'role_system_admin', ?)
-    `).run(ids.adminUserId, ids.tenantId);
+    bootstrapFirstRun(db, { skipCredentialsFile: true });
 
     try { initDbLifecycle({ db }); } catch { /* already initialised */ }
     handlers.clear();
     clearAllSessions();
     registerAdminHandlers();
   });
+
+  /** Grant SystemAdmin to the seeded admin user (used by positive paths). */
+  function grantSystemAdmin(): void {
+    db.prepare(`
+      INSERT OR IGNORE INTO user_roles (id, user_id, role_id, tenant_id)
+      VALUES ('ur_sysadmin', ?, 'role_system_admin', ?)
+    `).run(ids.adminUserId, ids.tenantId);
+  }
 
   afterEach(() => {
     clearAllSessions();
@@ -69,6 +72,7 @@ describe('admin:createTenant', () => {
   });
 
   it('rejects invalid tenant ids', async () => {
+    grantSystemAdmin();
     setSession(42, {
       userId: ids.adminUserId, tenantId: ids.tenantId,
       roles: ['SystemAdmin'], loggedInAt: 0,
@@ -82,6 +86,7 @@ describe('admin:createTenant', () => {
   });
 
   it('rejects short passwords', async () => {
+    grantSystemAdmin();
     setSession(42, {
       userId: ids.adminUserId, tenantId: ids.tenantId,
       roles: ['SystemAdmin'], loggedInAt: 0,
@@ -95,6 +100,7 @@ describe('admin:createTenant', () => {
   });
 
   it('creates tenant + TenantAdmin + audit chain event', async () => {
+    grantSystemAdmin();
     setSession(42, {
       userId: ids.adminUserId, tenantId: ids.tenantId,
       roles: ['SystemAdmin'], loggedInAt: 0,
@@ -126,6 +132,7 @@ describe('admin:createTenant', () => {
   });
 
   it('rejects duplicate tenant ids with tenant_exists', async () => {
+    grantSystemAdmin();
     setSession(42, {
       userId: ids.adminUserId, tenantId: ids.tenantId,
       roles: ['SystemAdmin'], loggedInAt: 0,

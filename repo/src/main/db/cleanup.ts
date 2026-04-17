@@ -98,3 +98,18 @@ export function getDb(): Database {
 }
 
 export function hasDbLifecycle(): boolean { return instance !== null; }
+
+/**
+ * Drop the singleton binding WITHOUT closing the underlying db.
+ *
+ * Used exclusively by unit tests that create a fresh in-memory db per test:
+ * the test owns the db handle (closes it in afterEach), but the singleton
+ * would otherwise keep a stale reference to a closed db across tests,
+ * causing "The database connection is not open" on the second test onwards.
+ *
+ * Not intended for production use — production initialises the lifecycle
+ * exactly once at app start.
+ */
+export function resetDbLifecycleForTests(): void {
+  instance = null;
+}

@@ -6,24 +6,35 @@ import { describe, expect, it, vi } from 'vitest';
  *  callback and replay URLs through it.
  * ========================================================================= */
 
-const onBeforeRequestSpy = vi.fn();
-const setPermissionHandler = vi.fn();
-const setPermissionCheck  = vi.fn();
-const setProxy            = vi.fn().mockResolvedValue(undefined);
-
-const session = {
-  defaultSession: {
-    webRequest: { onBeforeRequest: onBeforeRequestSpy },
-    setPermissionRequestHandler: setPermissionHandler,
-    setPermissionCheckHandler:  setPermissionCheck,
-    setProxy,
-  },
-};
+// vi.mock is hoisted above top-level variables, so any shared state the
+// factory references has to be hoisted too — otherwise the factory runs
+// before the `const session = { … }` initialiser and the user sees
+// "ReferenceError: Cannot access 'session' before initialization" (shown
+// by vitest as an opaque "error when mocking a module").
+const m = vi.hoisted(() => {
+  const onBeforeRequestSpy   = vi.fn();
+  const setPermissionHandler = vi.fn();
+  const setPermissionCheck   = vi.fn();
+  const setProxy             = vi.fn().mockResolvedValue(undefined);
+  return {
+    onBeforeRequestSpy, setPermissionHandler, setPermissionCheck, setProxy,
+    session: {
+      defaultSession: {
+        webRequest: { onBeforeRequest: onBeforeRequestSpy },
+        setPermissionRequestHandler: setPermissionHandler,
+        setPermissionCheckHandler:  setPermissionCheck,
+        setProxy,
+      },
+    },
+  };
+});
 
 vi.mock('electron', () => ({
-  session,
+  session: m.session,
   app: { on: vi.fn() },
 }));
+
+const { onBeforeRequestSpy, setPermissionHandler, setPermissionCheck } = m;
 
 import { installNetworkGuard } from '../../src/main/security/network-guard';
 

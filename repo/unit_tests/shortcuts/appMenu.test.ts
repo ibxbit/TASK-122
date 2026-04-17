@@ -5,19 +5,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  *  Ctrl+K / Ctrl+E broadcast, Ctrl+Shift+L opens audit, menu structure.
  * ========================================================================= */
 
-const openMock = vi.fn();
-const focusedSendMock = vi.fn();
-const focusedWindow = {
-  webContents: { send: focusedSendMock },
-  isDestroyed: () => false,
-};
-
-let setApplicationMenuTemplate: any = null;
+// All module-mock factories are hoisted to the top of the file by Vitest,
+// so anything they reference must be hoisted too — otherwise the factories
+// run before the `const openMock = …` / `const focusedWindow = …`
+// declarations execute, producing ReferenceError / opaque "error when
+// mocking a module" messages.  Wrap shared state in vi.hoisted().
+const mocks = vi.hoisted(() => {
+  const focusedSendMock = vi.fn();
+  return {
+    openMock: vi.fn(),
+    focusedSendMock,
+    focusedWindow: {
+      webContents: { send: focusedSendMock },
+      isDestroyed: () => false,
+    },
+    menuState: { template: null as any },
+  };
+});
 
 vi.mock('electron', () => ({
-  BrowserWindow: { getFocusedWindow: () => focusedWindow },
+  BrowserWindow: { getFocusedWindow: () => mocks.focusedWindow },
   Menu: {
-    buildFromTemplate: (t: any) => { setApplicationMenuTemplate = t; return t; },
+    buildFromTemplate: (t: any) => { mocks.menuState.template = t; return t; },
     setApplicationMenu: vi.fn(),
   },
   globalShortcut: {
@@ -27,8 +36,10 @@ vi.mock('electron', () => ({
 }));
 
 vi.mock('../../src/main/windows/WindowManager', () => ({
-  windowManager: { open: openMock },
+  windowManager: { open: mocks.openMock },
 }));
+
+const { openMock, focusedSendMock, menuState } = mocks;
 
 import { shortcutManager } from '../../src/main/shortcuts/ShortcutManager';
 import { DEFAULT_SHORTCUTS, buildAppMenu } from '../../src/main/shortcuts/AppMenu';
@@ -66,8 +77,8 @@ describe('buildAppMenu()', () => {
   });
 
   it('builds a menu with File, Go, View submenus', () => {
-    expect(setApplicationMenuTemplate).toBeDefined();
-    const labels = setApplicationMenuTemplate.map((s: any) => s.label);
+    expect(menuState.template).toBeDefined();
+    const labels = menuState.template.map((s: any) => s.label);
     expect(labels).toEqual(['File', 'Go', 'View']);
   });
 
@@ -87,20 +98,20 @@ describe('buildAppMenu()', () => {
   });
 
   it('Go submenu includes Dashboard and Contract Workspace entries', () => {
-    const goMenu = setApplicationMenuTemplate.find((s: any) => s.label === 'Go');
+    const goMenu = menuState.template.find((s: any) => s.label === 'Go');
     const labels = goMenu.submenu.map((i: any) => i.label).filter(Boolean);
     expect(labels).toContain('Dashboard');
     expect(labels).toContain('Contract Workspace');
   });
 
   it('File submenu includes Export shortcut', () => {
-    const fileMenu = setApplicationMenuTemplate.find((s: any) => s.label === 'File');
+    const fileMenu = menuState.template.find((s: any) => s.label === 'File');
     const labels = fileMenu.submenu.map((i: any) => i.label).filter(Boolean);
     expect(labels).toContain('Export…');
   });
 
   it('View submenu includes zoom roles', () => {
-    const viewMenu = setApplicationMenuTemplate.find((s: any) => s.label === 'View');
+    const viewMenu = menuState.template.find((s: any) => s.label === 'View');
     const roles = viewMenu.submenu.map((i: any) => i.role).filter(Boolean);
     expect(roles).toContain('zoomIn');
     expect(roles).toContain('zoomOut');

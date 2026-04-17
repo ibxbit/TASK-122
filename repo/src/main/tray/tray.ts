@@ -100,6 +100,8 @@ class TrayManager {
   destroy(): void {
     if (this.tray && !this.tray.isDestroyed()) this.tray.destroy();
     this.tray = null;
+    this.deps = null;
+    this._isQuitting = false;
   }
 
   /**

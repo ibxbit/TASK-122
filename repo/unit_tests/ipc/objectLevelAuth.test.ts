@@ -66,6 +66,16 @@ describe('Object-level ABAC at handler invocation', () => {
         ('ds_1', 'ur_ops', '{"locationId":"loc_nyc"}')
     `).run();
 
+    // Grant approve / reject permissions to OperationsManager so the
+    // object-scope check (not the RBAC check) is what rejects an out-of-
+    // scope contract.  seedAccessGraph only wires list + delete.
+    db.prepare(`INSERT OR IGNORE INTO permissions (id, code, type, action, description) VALUES
+      ('p_contract_approve', 'contract.approve', 'resource', 'write', 'Approve contract'),
+      ('p_contract_reject',  'contract.reject',  'resource', 'write', 'Reject contract')`).run();
+    db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id, effect) VALUES
+      ('role_operations_manager', 'p_contract_approve', 'allow'),
+      ('role_operations_manager', 'p_contract_reject',  'allow')`).run();
+
     handlers.clear();
     clearAllSessions();
     registerContractHandlers();

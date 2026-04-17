@@ -11,17 +11,23 @@ import crypto from 'node:crypto';
  *  Electron's app.getPath('userData') is stubbed to a temp directory.
  * ========================================================================= */
 
-let USER_DATA: string;
-
-vi.mock('electron', async () => {
-  USER_DATA = await fs.mkdtemp(path.join(os.tmpdir(), 'lh-userdata-'));
-  return {
-    app: {
-      getPath: (k: string) => (k === 'userData' ? USER_DATA : USER_DATA),
-      getVersion: () => '1.0.0',
-    },
-  };
+// vi.mock is hoisted, so module-level `let USER_DATA` would be undefined
+// when the factory runs.  Hoist the path creation into the factory closure
+// itself — fs.mkdtempSync is synchronous so we can keep the factory sync.
+const userDataHolder = vi.hoisted(() => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- top of factory, no ESM import yet
+  const nodeFs = require('node:fs') as typeof import('node:fs');
+  const nodeOs = require('node:os') as typeof import('node:os');
+  const nodePath = require('node:path') as typeof import('node:path');
+  return { path: nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), 'lh-userdata-')) };
 });
+
+vi.mock('electron', () => ({
+  app: {
+    getPath: (_k: string) => userDataHolder.path,
+    getVersion: () => '1.0.0',
+  },
+}));
 
 import { importPackage, UpdateLoadError } from '../../src/main/updates/loader';
 

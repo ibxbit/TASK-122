@@ -4,5 +4,5 @@
  * file layout.  Schemas live under ./schema, migrations under ./migrations.
  * ========================================================================= */
 
-export { getDb, getDbLifecycle, initDbLifecycle, hasDbLifecycle, DbLifecycle } from './cleanup';
+export { getDb, getDbLifecycle, initDbLifecycle, hasDbLifecycle, DbLifecycle, resetDbLifecycleForTests } from './cleanup';
 export type { DbLifecycleDeps } from './cleanup';
