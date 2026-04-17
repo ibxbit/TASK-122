@@ -201,7 +201,10 @@ export function verifyAuditChain(
   };
 }
 
-function fail(rows: AuditRow[], at: AuditRow, reason: VerifyResult['break']['reason']): VerifyResult {
+function fail(
+  rows: AuditRow[], at: AuditRow,
+  reason: NonNullable<VerifyResult['break']>['reason'],
+): VerifyResult {
   return {
     ok: false,
     totalEvents:    rows.length,

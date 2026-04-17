@@ -158,12 +158,18 @@ function csv(v: unknown): string {
 
 interface ManifestFile { name: string; size_bytes: number; sha256: string; }
 
-interface ManifestInput {
+/** Inputs needed to render the human-readable PDF and manifest header.
+ *  The file-fingerprint list is only needed by the manifest writer, so
+ *  it lives on `ManifestInput` below. */
+interface PdfRenderInput {
   bundleId:    string;
   generatedAt: number;
   query:       AuditExportQuery;
   events:      AuditRow[];
   verify:      VerifyResult;
+}
+
+interface ManifestInput extends PdfRenderInput {
   files:       ManifestFile[];
 }
 
@@ -206,7 +212,7 @@ function buildManifest(i: ManifestInput): Record<string, unknown> {
 
 const PDF_EVENT_LIMIT = 200;
 
-async function buildPdf(i: ManifestInput): Promise<Buffer> {
+async function buildPdf(i: PdfRenderInput): Promise<Buffer> {
   const win = new BrowserWindow({
     show: false, width: 1024, height: 1400,
     webPreferences: {
@@ -227,7 +233,7 @@ async function buildPdf(i: ManifestInput): Promise<Buffer> {
   }
 }
 
-function pdfHtml(i: ManifestInput): string {
+function pdfHtml(i: PdfRenderInput): string {
   const truncated = i.events.length > PDF_EVENT_LIMIT;
   const sample    = truncated ? i.events.slice(0, PDF_EVENT_LIMIT) : i.events;
 

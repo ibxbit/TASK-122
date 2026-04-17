@@ -35,6 +35,27 @@ echo "=============================================================="
 
 FAILED=0
 
+# Resolve the vitest CLI directly.  `npx --no-install` changed shape in
+# npm 10 and fails to find the bin symlink when the lockfile was generated
+# with a different npm major, which is exactly what happened in CI.  Call
+# the installed entry script ourselves; fall back to `npx -y` on a clean
+# checkout where node_modules is empty.
+#
+# dist/cli.js is tried FIRST because the top-level `vitest.mjs` in
+# vitest@2 depends on a dynamic-import chunk that fails on some installs
+# (TypeError: Cannot destructure property 'divider' of '(intermediate
+# value)').  dist/cli.js bypasses that shim.
+if [ -f "./node_modules/vitest/dist/cli.js" ]; then
+  VITEST_CMD="node ./node_modules/vitest/dist/cli.js"
+elif [ -f "./node_modules/vitest/vitest.mjs" ]; then
+  VITEST_CMD="node ./node_modules/vitest/vitest.mjs"
+elif [ -x "./node_modules/.bin/vitest" ]; then
+  VITEST_CMD="./node_modules/.bin/vitest"
+else
+  VITEST_CMD="npx -y vitest"
+fi
+echo " vitest cmd: $VITEST_CMD"
+
 has_tests() {
   local dir="$1"
   [ -d "$dir" ] && find "$dir" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.mjs' \) 2>/dev/null | grep -q .
@@ -45,7 +66,7 @@ echo
 echo "--- 1/3 Unit tests ---"
 if has_tests "unit_tests"; then
   if ! LH_USER_DATA="$TEST_DATA_DIR" \
-       npx --no-install vitest run unit_tests --reporter=verbose; then
+       $VITEST_CMD run unit_tests --reporter=verbose; then
     echo "FAIL: unit tests"
     FAILED=$((FAILED + 1))
   fi
@@ -58,7 +79,7 @@ echo
 echo "--- 2/3 Integration tests ---"
 if has_tests "integration_tests"; then
   if ! LH_USER_DATA="$TEST_DATA_DIR" \
-       npx --no-install vitest run integration_tests --reporter=verbose; then
+       $VITEST_CMD run integration_tests --reporter=verbose; then
     echo "FAIL: integration tests"
     FAILED=$((FAILED + 1))
   fi

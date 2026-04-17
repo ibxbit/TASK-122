@@ -264,7 +264,10 @@ function reconstructLeg(r: DijkstraResult, toNode: number, fromIdx: number, toId
   let cur: number | undefined = toNode;
   while (cur !== undefined && r.parent.has(cur)) {
     pathNodes.unshift(cur);
-    const p = r.parent.get(cur)!;
+    // Explicit annotation: stricter TS (5.5+) otherwise infers `p` as
+    // `any` because `cur` is re-assigned from `p.from` in the loop body,
+    // which the control-flow analyser flags as self-referential.
+    const p: { from: number; via: GraphEdge } = r.parent.get(cur)!;
     if (p.via.viaEdges) edgeIds.unshift(...p.via.viaEdges);
     else if (p.via.edgeId >= 0) edgeIds.unshift(p.via.edgeId);
     cur = p.from;

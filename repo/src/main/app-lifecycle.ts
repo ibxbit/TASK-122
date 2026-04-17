@@ -45,12 +45,17 @@ export function installTray(deps: TrayIntegrationDeps): void {
   // Default Electron behaviour is "quit when last window closes".  Override:
   // we want the process (and the scheduler inside it) to keep running in
   // the tray until the user explicitly selects Quit.
-  app.on('window-all-closed', (event: Electron.Event) => {
+  //
+  // Electron emits an Event argument at runtime but the `@types/electron`
+  // signature declares `() => void`.  We cast through `unknown` so the
+  // runtime `event.preventDefault()` still works while TS accepts the
+  // listener shape.
+  app.on('window-all-closed', ((event: Electron.Event) => {
     if (!trayManager.isQuitting) {
       event.preventDefault();
       logger.info('all_windows_closed_kept_alive');
     }
-  });
+  }) as unknown as () => void);
 
   // Any quit path (Ctrl+Q, native menu, Cmd+Q, OS shutdown) flips the flag
   // so window-close handlers stop intercepting.

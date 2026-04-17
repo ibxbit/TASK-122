@@ -23,7 +23,16 @@ WORKDIR /app
 
 # Dependency layer — cached unless package.json changes.
 COPY package.json package-lock.json* ./
-RUN (npm ci --no-audit --no-fund) || (npm install --no-audit --no-fund)
+# Install + self-repair.  BuildKit's cache layer has occasionally produced
+# zero-byte npm package chunks on crowded disks; if any installed *.js is
+# empty after install, rewrite the tree before committing the layer.
+RUN ((npm ci --no-audit --no-fund) || (npm install --no-audit --no-fund)) \
+ && if find node_modules -type f -name '*.js' -size 0 | grep -q . ; then \
+      echo "DETECTED 0-byte npm chunks — repairing with a fresh install" ; \
+      npm install --no-audit --no-fund --force ; \
+    fi \
+ && test -z "$(find node_modules -type f -name '*.js' -size 0 | head -1)" \
+    || (echo "0-byte chunks persist after repair" >&2 ; exit 1)
 
 # Source + optional build (tolerate missing build script during scaffolding).
 COPY . .

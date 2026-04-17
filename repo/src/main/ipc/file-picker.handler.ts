@@ -31,9 +31,11 @@ export interface PickedImage {
 export function registerFilePickerHandlers(): void {
   ipcMain.handle('files:pickImages', async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
-    const opts = {
+    // `properties` must be a mutable string[] for Electron's dialog types —
+    // `as const` would produce a readonly tuple that the overload rejects.
+    const opts: Electron.OpenDialogOptions = {
       title:       'Attach images to review',
-      properties:  ['openFile', 'multiSelections'] as const,
+      properties:  ['openFile', 'multiSelections'],
       filters:     [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png'] }],
     };
     const result = win
