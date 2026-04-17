@@ -30,8 +30,6 @@ coverage/
 *.swp
 *.swo
 
-# Ignore local test/run scripts
-run_tests.sh
 
 # Ignore compiled TypeScript
 *.tsbuildinfo
@@ -44,8 +42,6 @@ run_tests.sh
 # Ignore Jupyter and notebook checkpoints
 .ipynb_checkpoints/
 
-# Ignore local metadata
-metadata.json
 
 # Ignore Docker artifacts
 docker-compose.override.yml
